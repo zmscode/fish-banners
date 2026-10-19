@@ -2,14 +2,15 @@
 
 Animated greeting banners for [fish](https://fishshell.com) in
 [Ghostty](https://ghostty.org) and [kitty](https://sw.kovidgoyal.net/kitty/).
-Every new terminal opens with a different generative animation, drawn as a
-real image in the terminal, and it clears itself away the moment you run
-your first command.
+Every new terminal opens with the next generative animation in the cycle,
+drawn as a real image in the terminal, and it clears itself away the moment
+you run your first command.
 
 ![Topography](docs/images/topography.gif)
 
 Seven banners, all coloured from the [0x96f](https://0x96f.dev) theme, each
-looping seamlessly until you press Enter:
+looping seamlessly until you press Enter. New windows step through them in
+turn, alphabetically, then start again:
 
 | | |
 |---|---|
@@ -30,7 +31,7 @@ transparent background.
 ```mermaid
 flowchart LR
     A[new fish shell] --> B[fish_greeting]
-    B -->|Ghostty / kitty| C[run.py picks a<br/>pre-rendered banner]
+    B -->|Ghostty / kitty| C[run.py takes the next<br/>banner in the cycle]
     B -->|any other terminal| T[_text.py:<br/>braille art]
     C --> D[draw first frame<br/>into placeholder cells]
     D --> E[animator swaps<br/>frames at 12 fps]
@@ -38,9 +39,11 @@ flowchart LR
     E -->|first Enter| G[stop, delete image,<br/>clear screen, run command]
 ```
 
-1. **Pick a banner.** When fish starts, `fish_greeting` runs
-   `banners/run.py` through [uv](https://docs.astral.sh/uv/), which picks a
-   banner at random from those with frames ready.
+1. **Take the next banner.** When fish starts, `fish_greeting` runs
+   `banners/run.py` through [uv](https://docs.astral.sh/uv/), which shows the
+   banner after the one shown last, alphabetically, looping round. It
+   remembers its place in `~/.cache/fish-banners/last`, under a lock, so
+   windows opening at the same moment each get the next one in turn.
 2. **Draw it as an image.** The frame is sent with the
    [Kitty graphics protocol](https://sw.kovidgoyal.net/kitty/graphics-protocol/),
    sized from the window's pixel dimensions, so it's crisp on any display. It's
@@ -182,7 +185,7 @@ added to `EFFECTS`, or `(recent_frames, phase) -> rgba_frame` added to
 ## Writing a banner
 
 Add a file to `banners/` (names starting with `_` are support code and are
-never picked). A banner is a module with:
+never shown). It joins the cycle automatically. A banner is a module with:
 
 ```python
 from dataclasses import dataclass
@@ -235,7 +238,7 @@ number of cycles between phase 0 and phase 1.
 
 ```
 functions/fish_greeting.fish   greeting: shows a banner, clears it on first Enter
-banners/run.py                 picks, caches, draws and animates banners
+banners/run.py                 cycles, caches, draws and animates banners
 banners/_common.py             noise, blur, colour, glyph and particle helpers
 banners/_post.py               post-processing effects
 banners/_text.py               text fallback for other terminals

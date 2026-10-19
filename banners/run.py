@@ -12,7 +12,8 @@ Each other module in this folder (not starting with "_") is a banner:
     def frame(state, phase): ...       # fast, per frame: H×W×4 uint8 RGBA
     POST = ["dither"]                  # effects from _post.py, in order (optional)
 
-Each greeting picks a banner at random and shows it inline with the Kitty
+Each greeting shows the next banner in turn (alphabetically, looping round)
+inline with the Kitty
 graphics protocol (Ghostty, kitty), transparent so the terminal's own
 background shows through.
 
@@ -34,7 +35,6 @@ import fcntl
 import functools
 import importlib
 import os
-import random
 import shutil
 import signal
 import struct
@@ -114,6 +114,23 @@ def banners() -> list[str]:
 def load(name: str) -> Banner:
     sys.path.insert(0, str(HERE))
     return cast(Banner, importlib.import_module(name))
+
+
+def next_banner(names: list[str]) -> str:
+    """The banner after the one shown last, looping round. A lock keeps
+    windows opening at the same moment from showing the same one."""
+    CACHE.mkdir(parents=True, exist_ok=True)
+    with open(CACHE / "last", "a+") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        f.seek(0)
+        last = f.read().strip()
+        name = (
+            names[(names.index(last) + 1) % len(names)] if last in names else names[0]
+        )
+        f.seek(0)
+        f.truncate()
+        f.write(name)
+    return name
 
 
 def frame_count(mod: Banner) -> int:
@@ -367,14 +384,11 @@ def show(rows: int, state_file: str) -> None:
         if time.time() - old.stat().st_mtime > MAX_SECONDS * 2:
             shutil.rmtree(old, ignore_errors=True)
 
-    # Pick at random among the banners ready to play; if none are, pick any
-    # and render it now.
-    names = banners()
-    ready = {
-        n: sorted(p.parent for p in (CACHE / n / size).glob("*/ready")) for n in names
-    }
+    # Next banner in the cycle: played from the cache if it's ready (it
+    # usually is), otherwise rendered now.
+    name = next_banner(banners())
+    ready = {name: sorted(p.parent for p in (CACHE / name / size).glob("*/ready"))}
     ready = {n: r for n, r in ready.items() if r}
-    name = random.choice(sorted(ready) or names)
     mod = load(name)
     frames = frame_count(mod)
     finish: Callable[[], None] | None = None

@@ -1,4 +1,4 @@
-function fish_greeting --description 'Random animated banner (see banners/), cleared on the first Enter'
+function fish_greeting --description 'Animated banner, the next one each time (see banners/), cleared on the first Enter'
 	# Ghostty and kitty can show a real image; anything else gets braille art.
 	if not __banner_supported; or not __banner_show
 		python3 $__fish_config_dir/banners/_text.py 12
@@ -11,7 +11,7 @@ function __banner_supported
 	test "$TERM_PROGRAM" = ghostty -o "$TERM" = xterm-kitty; and not set -q TMUX
 end
 
-# Show a random banner and remember its animator and
+# Show the next banner and remember its animator and
 # image so the first Enter can clean up.
 function __banner_show
 	set -l state (mktemp -t banner)
