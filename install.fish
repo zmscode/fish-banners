@@ -19,17 +19,23 @@ for item in banners functions/fish_greeting.fish
 	set -l source $repo/$item
 	set -l target $config/$item
 	if test -L $target; and test (path resolve $target) = $source
-		echo "already linked: $target"
-		continue
-	end
-	if test -e $target -o -L $target
+		if not set -q _flag_copy
+			echo "already linked: $target"
+			continue
+		end
+		rm $target # a link to this repo: nothing to keep
+	else if test -e $target -o -L $target
 		set -l backup $target.bak.(date +%s)
 		mv $target $backup
 		echo "moved aside:    $target → $backup"
 	end
 	mkdir -p (path dirname $target)
 	if set -q _flag_copy
-		cp -R $source $target
+		# Leave out the dev environment and caches: a .venv hard-codes its
+		# own path, so it would break once copied.
+		set -l from $source
+		test -d $source; and set from $source/ # copy the folder's contents, not the folder into itself
+		rsync -a --exclude .venv --exclude .ruff_cache --exclude __pycache__ $from $target
 		echo "copied:         $target"
 	else
 		ln -s $source $target
